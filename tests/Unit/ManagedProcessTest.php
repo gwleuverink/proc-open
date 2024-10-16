@@ -8,10 +8,15 @@ test('can start a managed process', function () {
 
     expect(ManagedProcess::start('process-key', 'sleep 20s'))
         ->running()->toBeTrue();
+
+    expect(ManagedProcess::get('process-key'))
+        ->running()->toBeTrue();
 });
 
 test('can retrieve a managed process after it was started', function () {
-    expect(ManagedProcess::get('process-key'))->dd()
+    $this->wip(note: 'Assumes the previous test ran first');
+
+    expect(ManagedProcess::get('process-key'))
         ->running()->toBeTrue();
 });
 
