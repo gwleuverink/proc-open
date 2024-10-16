@@ -2,24 +2,34 @@
 
 namespace App\Support\ManagedProcess;
 
-use Illuminate\Process\Factory as ProcessFactory;
-
 class Factory
 {
-    public function __construct(
-        protected ProcessFactory $process = new ProcessFactory
-    ) {}
-
     /**
-     * @throws \Illuminate\Process\Exceptions\ProcessTimedOutException
      * @throws \RuntimeException
      */
-    public function start(string $alias, array|string|null $command = null, ?callable $output = null): InvokedProcess
+    public function start(string $alias, array|string|null $command = null, array $env = []): InvokedProcess
     {
-        /** @var InvokedProcess $process */
-        $process = $this->process->start($command, $output);
+        // TODO: Consider changing the io streams?
+        // we might be able to use fwrite & fgets to communicate?
+        // Might be useless since we lose the reference to the pipes on the next request? unless we can retreive them later by pid?
+        $descriptors = [];
+        $pipes = [];
 
-        return $this->register($alias, $process->id(), $command);
+        $process = proc_open(
+            $command,
+            $descriptors,
+            $pipes,
+            base_path(),
+            $env,
+        );
+
+        if (! is_resource($process)) {
+            throw new \RuntimeException("Unable to execute '{$command}'");
+        }
+
+        $status = proc_get_status($process);
+
+        return $this->register($alias, $status['pid'] ?? null, $command);
     }
 
     public function get(string $alias): ?InvokedProcess
