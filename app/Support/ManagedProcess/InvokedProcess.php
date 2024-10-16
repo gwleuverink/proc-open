@@ -22,6 +22,11 @@ class InvokedProcess
         return $this->pid;
     }
 
+    public function command(): ?string
+    {
+        return $this->command;
+    }
+
     public function running()
     {
         if (! $this->id()) {
@@ -37,30 +42,43 @@ class InvokedProcess
             },
             default => function () {
                 $process = Process::run("ps -p {$this->pid}");
+                $output = str($process->output());
 
-                return str($process->output())->contains($this->pid);
+                // Account for zombie processes
+                // TODO: Find a better solution that closes the process
+                if ($output->contains('<defunct>')) {
+                    return false;
+                }
+
+                return $output->contains($this->pid);
             }
         };
 
         return $determineRunning();
     }
 
-    // public function restart(): self
-    // {
-    //     //
-    // }
+    public function restart(): self
+    {
+        $this->stop();
 
-    // public function stop(): self
-    // {
-    //     match (PHP_OS_FAMILY) {
-    //         'Windows' => Process::run("taskkill /F /PID {$this->id()}"),
-    //         default => Process::run("kill {$this->id()}")
-    //     };
+        // TODO: Add original env argument
+        return (new Factory)->start(
+            $this->alias(),
+            $this->command(),
+        );
+    }
 
-    //     $this->pid = null;
+    public function stop(): self
+    {
+        match (PHP_OS_FAMILY) {
+            'Windows' => Process::run("taskkill /F /PID {$this->id()}"),
+            default => Process::run("kill {$this->id()}")
+        };
 
-    //     return $this;
-    // }
+        $this->pid = null;
+
+        return $this;
+    }
 
     // public function throw(): self
     // {

@@ -30,9 +30,9 @@
 
                 @dump($process->running())
             @else
-                @dump("ManagedProcess::start('some-foo', 'sleep 20s')")
+                @dump("ManagedProcess::start('some-foo', 'sleep 5s')")
 
-                @dump($process = ManagedProcess::start('some-foo', 'sleep 20s'))
+                @dump($process = ManagedProcess::start('some-foo', 'sleep 5s'))
 
                 @dump($process->running())
             @endif

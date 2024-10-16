@@ -34,21 +34,27 @@ class Factory
 
     public function get(string $alias): ?InvokedProcess
     {
-        if (! $stored = session()->get("managed-process.$alias")) {
+        if (! $stored = cache()->get("managed-process.$alias")) {
             return new InvokedProcess($alias, null, null);
         }
 
-        return new InvokedProcess($alias, $stored->pid, $stored->command);
+        if (! $stored->running()) {
+            return $this->register($alias, null, $stored->command());
+        }
+
+        return $stored;
     }
 
-    private function register(string $alias, int $pid, array|string|null $command = null): InvokedProcess
+    private function register(string $alias, ?int $pid, ?string $command = null): InvokedProcess
     {
-        // Not definitive!
-        session()->put("managed-process.$alias", (object) [
-            'pid' => $pid,
-            'command' => $command,
-        ]);
+        cache()->forget("managed-process.$alias");
 
-        return new InvokedProcess($alias, $pid, $command);
+        // Not definitive!
+        $process = cache()->rememberForever(
+            "managed-process.$alias",
+            fn () => new InvokedProcess($alias, $pid, $command)
+        );
+
+        return $process;
     }
 }

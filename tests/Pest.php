@@ -16,6 +16,7 @@ pest()->extend(Tests\TestCase::class)
     ->in('Feature');
 
 pest()->extend(Tests\TestCase::class)
+    ->use(\Illuminate\Foundation\Testing\DatabaseMigrations::class)
     ->in('Unit');
 
 /*
