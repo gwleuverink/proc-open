@@ -44,12 +44,6 @@ class InvokedProcess
                 $process = Process::run("ps -p {$this->pid}");
                 $output = str($process->output());
 
-                // Account for zombie processes
-                // TODO: Find a better solution that closes the process
-                if ($output->contains('<defunct>')) {
-                    return false;
-                }
-
                 return $output->contains($this->pid);
             }
         };

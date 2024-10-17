@@ -7,16 +7,21 @@ class Factory
     /**
      * @throws \RuntimeException
      */
-    public function start(string $alias, array|string|null $command = null, array $env = []): InvokedProcess
+    public function start(string $alias, ?string $command = null, array $env = []): InvokedProcess
     {
         // TODO: Consider changing the io streams?
         // we might be able to use fwrite & fgets to communicate?
         // Might be useless since we lose the reference to the pipes on the next request? unless we can retreive them later by pid?
-        $descriptors = [];
+
         $pipes = [];
+        $descriptors = [
+            ['pipe', 'r'], // stdin
+            ['pipe', 'w'], // stout
+            ['pipe', 'w'], // sterr
+        ];
 
         $process = proc_open(
-            $command,
+            $this->fork($command),
             $descriptors,
             $pipes,
             base_path(),
@@ -27,9 +32,19 @@ class Factory
             throw new \RuntimeException("Unable to execute '{$command}'");
         }
 
-        $status = proc_get_status($process);
+        // Read the PID from the output.
+        // Relies on the double fork to output the child pid
+        $pid = (int) fgets($pipes[1]);
 
-        return $this->register($alias, $status['pid'] ?? null, $command);
+        // Close pipes
+        foreach ($pipes as $pipe) {
+            fclose($pipe);
+        }
+
+        // Close the process handle
+        proc_close($process);
+
+        return $this->register($alias, $pid ?? null, $command);
     }
 
     public function get(string $alias): ?InvokedProcess
@@ -45,6 +60,12 @@ class Factory
         return $stored;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Register the process in the process store
+    |--------------------------------------------------------------------------
+    | Should use some other mechanism for keeping track of process data
+    */
     private function register(string $alias, ?int $pid, ?string $command = null): InvokedProcess
     {
         cache()->forget("managed-process.$alias");
@@ -57,4 +78,44 @@ class Factory
 
         return $process;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Wrap the given command in a double fork
+    |--------------------------------------------------------------------------
+    | If we run the original command through proc_open A zombie hang around
+    | Normally we would proc_close in the parent when the child exits
+    | By double-forking it the forked process closes itself
+    */
+    private function fork(string $command): string
+    {
+        // TODO: This only works on Unix right now. Needs a poweshell alternative
+        return <<< BASH
+            (
+                (
+                    $command &
+                    echo $!  # This outputs the PID of the last background process
+
+                    # Wait for the process to finish
+                    wait $!
+                    exit 0
+                ) &
+            ) &
+
+            exit 0
+        BASH;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | The lab - experimental
+    |--------------------------------------------------------------------------
+    */
+
+    // TODO: Consider artisan shorthand
+    // public function artisan(string $command): InvokedProcess {}
+
+    // TODO: Consider fluent api (and make alias an optional argument in methods that require it)
+    // Process::alias('foo')->start('sleep 10s');
+    // public function alias(string $alias): self {}
 }
